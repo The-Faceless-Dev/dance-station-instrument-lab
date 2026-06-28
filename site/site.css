@@ -1,0 +1,325 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0f13;
+  --panel: #111820;
+  --panel-2: #151d26;
+  --line: #27313c;
+  --text: #e7edf4;
+  --muted: #91a1b2;
+  --accent: #36d1b7;
+  --accent-2: #83a7ff;
+  --warn: #e3bd5e;
+  --bad: #ff6b7a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.workspace.instrument-page {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.78fr) minmax(560px, 1.8fr) minmax(260px, 0.85fr);
+  gap: 14px;
+  min-height: 760px;
+  padding: 14px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  min-width: 0;
+}
+
+.instrument-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.compact-heading {
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+h2,
+h3 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h2 {
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+h3 {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.editor-subtitle,
+.summary,
+.empty-result {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.field input,
+.field select,
+.instrument-track-item input,
+.instrument-track-item select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0d131a;
+  color: var(--text);
+  padding: 7px 9px;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.button-row,
+.piano-roll-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: #151f2a;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.primary-button {
+  border-color: rgba(54, 209, 183, 0.55);
+  background: #17352f;
+}
+
+.secondary-button:hover,
+.primary-button:hover {
+  border-color: var(--accent);
+}
+
+.secondary-button:disabled,
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.compact-button {
+  min-height: 30px;
+  padding: 5px 8px;
+}
+
+.mini-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.mini-state.ok { color: var(--accent); border-color: rgba(54, 209, 183, 0.5); }
+.mini-state.warn { color: var(--warn); border-color: rgba(227, 189, 94, 0.55); }
+.mini-state.error { color: var(--bad); border-color: rgba(255, 107, 122, 0.55); }
+
+.instrument-track-list {
+  display: grid;
+  gap: 8px;
+}
+
+.instrument-track-item {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  padding: 10px;
+}
+
+.instrument-track-item.active {
+  border-color: rgba(54, 209, 183, 0.6);
+}
+
+.track-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.track-head button {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.track-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.track-toggles label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.piano-roll-toolbar {
+  justify-content: space-between;
+}
+
+.instrument-piano-roll {
+  width: 100%;
+  height: 480px;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #070b10;
+  cursor: crosshair;
+}
+
+.piano-roll-scroll {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.piano-roll-scroll input {
+  width: 100%;
+}
+
+.instrument-piano-keys {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.piano-key {
+  min-height: 42px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.piano-key.white {
+  background: #dce5ef;
+  color: #101820;
+}
+
+.piano-key.black {
+  background: #0b1017;
+  color: #dce5ef;
+}
+
+.activity-readout {
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #0d131a;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.audio-player {
+  width: 100%;
+  margin: 10px 0;
+}
+
+.generated-list {
+  display: grid;
+  gap: 8px;
+}
+
+.generated-item {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  padding: 10px;
+}
+
+.generated-item strong {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%) translateY(12px);
+  opacity: 0;
+  pointer-events: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111820;
+  color: var(--text);
+  padding: 10px 12px;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 1100px) {
+  .workspace.instrument-page {
+    grid-template-columns: 1fr;
+  }
+}
