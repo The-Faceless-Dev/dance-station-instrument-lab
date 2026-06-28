@@ -1,0 +1,11 @@
+{
+  "name": "@faceless-dancer/dance-station-instrument-lab",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared Instrument Lab module for Dance Station.",
+  "scripts": {
+    "check": "node scripts/check-source-snapshot.js"
+  },
+  "license": "MIT"
+}

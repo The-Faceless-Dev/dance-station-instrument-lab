@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dance Station</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="brand">The Faceless Dancer</p>
+        <h1>Dance Station</h1>
+      </div>
+      <div class="status-strip" aria-live="polite">
+        <span id="ffmpegBadge" class="badge neutral">ffmpeg</span>
+        <span id="modelCountBadge" class="badge neutral">models</span>
+        <span id="runtimeBadge" class="badge neutral">runtime</span>
+      </div>
+    </header>
+
+    <nav class="tabbar" aria-label="Workspace">
+      <button id="transitionTabButton" class="tab-button active" type="button">Autotransition</button>
+      <button id="extractionTabButton" class="tab-button" type="button">Track Extraction</button>
+      <button id="musicTabButton" class="tab-button" type="button">Music Generation</button>
+      <button id="lokrTrainingTabButton" class="tab-button" type="button">LoKr Training</button>
+      <button id="instrumentLabTabButton" class="tab-button" type="button">Instrument Lab</button>
+      <button id="audioEditTabButton" class="tab-button" type="button">Audio Editor</button>
+      <button id="libraryTabButton" class="tab-button" type="button">Library</button>
+    </nav>
+
+    <main id="transitionPage" class="workspace app-page active">
+      <section class="panel workflow-panel">
+        <div class="panel-heading">
+          <h2>Source</h2>
+          <span id="sourceState" class="mini-state">Idle</span>
+        </div>
+
+        <div class="file-picker">
+          <label class="file-button" for="sourceFile">Choose Audio File</label>
+          <input id="sourceFile" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,audio/*" />
+          <span id="selectedFileName">No file selected</span>
+        </div>
+
+        <div class="existing-source-picker">
+          <label class="field">
+            <span>Existing creation</span>
+            <select id="sourceAssetSelect">
+              <option value="">Choose an existing creation</option>
+            </select>
+          </label>
+          <button id="loadSourceAssetButton" class="secondary-button" type="button">Load Creation</button>
+        </div>
+
+        <label class="field">
+          <span>Audio path</span>
+          <input id="sourcePath" type="text" placeholder="D:\music\song.mp3 or clip.wav" />
+        </label>
+
+        <div class="button-row source-actions">
+          <button id="loadSourceButton" class="secondary-button" type="button">Load Song</button>
+          <span id="sourceDuration" class="inline-readout">No source loaded</span>
+        </div>
+
+        <audio id="sourceAudio" class="audio-player" controls preload="metadata"></audio>
+
+        <div class="timeline-shell">
+          <div class="timeline-meta">
+            <span id="currentTimeReadout">0:00</span>
+            <span id="continuationReadout">Continue at 0:00</span>
+          </div>
+          <input id="continuationSlider" class="timeline-slider" type="range" min="0" max="0" step="0.01" value="0" />
+          <div class="selection-readout">
+            <span id="contextRange">Context not selected</span>
+            <span id="futureRange">Future length follows settings</span>
+          </div>
+          <div class="selection-readout">
+            <span id="sourceFormatReadout">Formats: MP3, WAV, FLAC, OGG, M4A</span>
+            <span id="outputFormatReadout">Output scaffold: WAV</span>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Target prompt</span>
+          <textarea id="captionInput" rows="7"></textarea>
+        </label>
+
+        <div id="promptSummary" class="summary">Prompt is sent to both the initial generation and the ACE repaint pass.</div>
+      </section>
+
+      <section class="panel settings-panel">
+        <div class="panel-heading">
+          <h2>Transition</h2>
+          <span id="actionState" class="mini-state">Ready</span>
+        </div>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>Source context seconds</span>
+            <input id="contextSeconds" type="number" min="1" step="0.5" />
+          </label>
+          <label class="field">
+            <span>New section seconds</span>
+            <input id="newSeconds" type="number" min="1" step="0.5" />
+          </label>
+          <label class="field">
+            <span>Repaint before marker seconds</span>
+            <input id="repaintOverlapSeconds" type="number" min="0" step="0.5" />
+          </label>
+          <label class="field">
+            <span>BPM</span>
+            <input id="bpmInput" type="number" min="1" step="0.1" value="120" />
+          </label>
+          <label class="field">
+            <span>Key</span>
+            <input id="keyInput" type="text" placeholder="optional" />
+          </label>
+          <label class="field">
+            <span>Seed</span>
+            <input id="seedInput" type="number" step="1" placeholder="optional" />
+          </label>
+        </div>
+
+        <details class="advanced-panel">
+          <summary>ACE-Step Advanced</summary>
+          <div class="advanced-heading">
+            <span>Model-aware defaults are applied unless changed.</span>
+            <button id="resetAceDefaultsButton" class="secondary-button compact-button" type="button">Reset</button>
+          </div>
+          <div class="control-grid">
+            <label class="field">
+              <span>Inference steps</span>
+              <input id="inferenceSteps" type="number" min="1" max="200" step="1" />
+            </label>
+            <label class="field">
+              <span>Guidance scale</span>
+              <input id="guidanceScale" type="number" min="0" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Shift</span>
+              <input id="shiftValue" type="number" min="0" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Repaint strength</span>
+              <input id="repaintStrength" type="number" min="0" max="1" step="0.05" />
+            </label>
+            <label class="field">
+              <span>Repaint mode</span>
+              <select id="repaintMode">
+                <option value="balanced">Balanced</option>
+                <option value="conservative">Conservative</option>
+                <option value="aggressive">Aggressive</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Latent crossfade frames</span>
+              <input id="repaintLatentCrossfadeFrames" type="number" min="0" max="200" step="1" />
+            </label>
+            <label class="field">
+              <span>Waveform crossfade seconds</span>
+              <input id="repaintWavCrossfadeSec" type="number" min="0" max="10" step="0.05" />
+            </label>
+          </div>
+        </details>
+
+        <label class="field">
+          <span>Output folder</span>
+          <input id="outputDir" type="text" placeholder="data/scaffolds" />
+        </label>
+
+        <div class="button-row">
+          <button id="generateButton" class="primary-button" type="button">Generate Transition</button>
+          <button id="refreshButton" class="secondary-button" type="button">Refresh Status</button>
+        </div>
+
+        <div class="output-block">
+          <h3>Generation Output</h3>
+          <div id="generationActivity" class="activity-readout">No generation running.</div>
+          <div id="generatedList" class="generated-list">
+            <div class="empty-result">No generated audio yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Model</h2>
+            <span id="modelState" class="mini-state">Checking</span>
+          </div>
+
+          <div id="modelDetails" class="summary"></div>
+          <label class="check-field locked-control">
+            <input id="autoInstallModel" type="checkbox" />
+            <span>Install selected model automatically when needed</span>
+          </label>
+          <button id="installModelButton" class="secondary-button full-width" type="button">Install Model</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>System</h2>
+            <span id="systemState" class="mini-state">Live</span>
+          </div>
+          <dl id="systemStatus" class="status-list"></dl>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Runtime</h2>
+            <span id="runtimeState" class="mini-state">Checking</span>
+          </div>
+          <div id="runtimeDetails" class="summary"></div>
+          <button id="copyRuntimeCommandButton" class="secondary-button full-width" type="button">Copy Runtime Commands</button>
+        </section>
+
+        <section class="panel logs-panel">
+          <div class="panel-heading">
+            <h2>Logs</h2>
+            <span id="logState" class="mini-state">Local</span>
+          </div>
+          <ol id="logList" class="log-list"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <main id="musicPage" class="workspace app-page">
+      <section class="panel workflow-panel">
+        <div class="panel-heading">
+          <h2>Prompt</h2>
+          <span id="musicActionState" class="mini-state">Ready</span>
+        </div>
+
+        <label class="field">
+          <span>Music prompt</span>
+          <textarea id="musicPrompt" rows="8" placeholder="suspenseful cinematic horror theme, dark ambient strings, low percussion"></textarea>
+        </label>
+
+        <div class="toggle-row">
+          <label><input id="musicInstrumental" type="checkbox" checked /> Instrumental</label>
+        </div>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>Vocal language</span>
+            <select id="musicVocalLanguage">
+              <option value="unknown" selected>Auto / unknown</option>
+              <option value="en">English</option>
+              <option value="zh">Chinese</option>
+              <option value="ja">Japanese</option>
+              <option value="ko">Korean</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="it">Italian</option>
+              <option value="pt">Portuguese</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Lyrics</span>
+          <textarea id="musicLyrics" rows="6" placeholder="Enter lyrics when Instrumental is off"></textarea>
+        </label>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>Label</span>
+            <input id="musicLabelInput" type="text" placeholder="optional name" />
+          </label>
+          <label class="field">
+            <span>Model</span>
+            <select id="musicModelSelect">
+              <option value="acestep-v15-turbo" selected>ACE-Step 1.5 XL Turbo</option>
+              <option value="acestep-v15-base">ACE-Step 1.5 Base</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>LoKr adapter</span>
+            <select id="musicLokrAdapterSelect">
+              <option value="">No LoKr</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>LoKr strength</span>
+            <input id="musicLokrScale" type="number" min="0" max="1" step="0.05" value="1" />
+          </label>
+          <label class="field">
+            <span>Output format</span>
+            <select id="musicOutputFormat">
+              <option value="flac">FLAC</option>
+              <option value="wav">WAV</option>
+              <option value="wav32">WAV 32-bit</option>
+              <option value="mp3">MP3</option>
+              <option value="opus">Opus</option>
+              <option value="aac">AAC</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Duration seconds</span>
+            <input id="musicDuration" type="number" min="10" max="300" step="1" value="30" />
+          </label>
+          <label class="field">
+            <span>Seed</span>
+            <input id="musicSeed" type="number" step="1" placeholder="optional" />
+          </label>
+        </div>
+
+        <div class="button-row">
+          <button id="runMusicButton" class="primary-button" type="button">Generate Music</button>
+          <button id="refreshMusicButton" class="secondary-button" type="button">Refresh Generations</button>
+        </div>
+
+        <div class="output-block">
+          <h3>Music Output</h3>
+          <div id="musicActivity" class="activity-readout">No music generation running.</div>
+          <div id="musicList" class="generated-list">
+            <div class="empty-result">No music generations yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Generation Settings</h2>
+            <span id="musicModelState" class="mini-state">Turbo</span>
+          </div>
+          <div class="control-grid">
+            <label class="field">
+              <span>Inference steps</span>
+              <input id="musicInferenceSteps" type="number" min="1" max="200" step="1" value="8" />
+            </label>
+            <label class="field">
+              <span>Guidance scale</span>
+              <input id="musicGuidanceScale" type="number" min="0" step="0.1" value="1" />
+            </label>
+            <label class="field">
+              <span>Shift</span>
+              <input id="musicShift" type="number" min="0" step="0.1" value="3" />
+            </label>
+            <label class="field">
+              <span>Infer method</span>
+              <select id="musicInferMethod">
+                <option value="ode" selected>ODE</option>
+                <option value="sde">SDE</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Velocity norm threshold</span>
+              <input id="musicVelocityNormThreshold" type="number" min="0" step="0.1" value="0" />
+            </label>
+            <label class="field">
+              <span>Velocity EMA factor</span>
+              <input id="musicVelocityEmaFactor" type="number" min="0" max="1" step="0.05" value="0" />
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label><input id="musicUseTiledDecode" type="checkbox" checked /> Tiled decode</label>
+            <label><input id="musicDcwEnabled" type="checkbox" /> DCW</label>
+          </div>
+        </section>
+
+        <section class="panel logs-panel">
+          <div class="panel-heading">
+            <h2>Logs</h2>
+            <span class="mini-state">Local</span>
+          </div>
+          <ol id="musicLogList" class="log-list"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <main id="extractionPage" class="workspace app-page">
+      <section class="panel workflow-panel">
+        <div class="panel-heading">
+          <h2>Extraction Source</h2>
+          <span id="extractSourceState" class="mini-state">Idle</span>
+        </div>
+
+        <div class="file-picker">
+          <label class="file-button" for="extractSourceFile">Choose Audio File</label>
+          <input id="extractSourceFile" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,audio/*" />
+          <span id="extractSelectedFileName">No file selected</span>
+        </div>
+
+        <div class="existing-source-picker">
+          <label class="field">
+            <span>Existing creation</span>
+            <select id="extractSourceAssetSelect">
+              <option value="">Choose an existing creation</option>
+            </select>
+          </label>
+          <button id="loadExtractSourceAssetButton" class="secondary-button" type="button">Load Creation</button>
+        </div>
+
+        <label class="field">
+          <span>Audio path</span>
+          <input id="extractSourcePath" type="text" placeholder="D:\music\song.mp3 or clip.wav" />
+        </label>
+
+        <div class="button-row source-actions">
+          <button id="loadExtractSourceButton" class="secondary-button" type="button">Load Song</button>
+          <span id="extractSourceDuration" class="inline-readout">No source loaded</span>
+        </div>
+
+        <audio id="extractSourceAudio" class="audio-player" controls preload="metadata"></audio>
+        <div class="selection-readout">
+          <span id="extractSourceFormatReadout">Formats: MP3, WAV, FLAC, OGG, M4A</span>
+          <span>Full song will be used for extraction</span>
+        </div>
+      </section>
+
+      <section class="panel settings-panel">
+        <div class="panel-heading">
+          <h2>Extract</h2>
+          <span id="extractActionState" class="mini-state">Ready</span>
+        </div>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>Track</span>
+            <select id="extractTrackSelect"></select>
+          </label>
+          <label class="field">
+            <span>Label</span>
+            <input id="extractLabelInput" type="text" placeholder="optional name" />
+          </label>
+          <label class="field">
+            <span>Output format</span>
+            <select id="extractOutputFormat">
+              <option value="flac">FLAC</option>
+              <option value="wav">WAV</option>
+              <option value="wav32">WAV 32-bit</option>
+              <option value="mp3">MP3</option>
+              <option value="opus">Opus</option>
+              <option value="aac">AAC</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Seed</span>
+            <input id="extractSeedInput" type="number" step="1" placeholder="optional" />
+          </label>
+          <label class="field">
+            <span>Inference steps</span>
+            <input id="extractInferenceSteps" type="number" min="1" max="200" step="1" value="80" />
+          </label>
+          <label class="field">
+            <span>Guidance scale</span>
+            <input id="extractGuidanceScale" type="number" min="0" step="0.1" value="1.0" />
+          </label>
+          <label class="field">
+            <span>Shift</span>
+            <input id="extractShift" type="number" min="0" step="0.1" value="1" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Instruction override</span>
+          <textarea id="extractInstruction" rows="4" placeholder="optional; ACE will generate this from the selected track when blank"></textarea>
+        </label>
+
+        <div class="button-row">
+          <button id="runExtractionButton" class="primary-button" type="button">Run Extraction</button>
+          <button id="refreshExtractionsButton" class="secondary-button" type="button">Refresh Extractions</button>
+        </div>
+
+        <div class="output-block">
+          <h3>Extraction Output</h3>
+          <div id="extractionActivity" class="activity-readout">No extraction running.</div>
+          <div class="merge-controls">
+            <label class="field">
+              <span>Merge label</span>
+              <input id="mergeLabelInput" type="text" placeholder="Full mix, instrumental, custom stem blend" />
+            </label>
+            <label class="field">
+              <span>Merge format</span>
+              <select id="mergeOutputFormat">
+                <option value="flac">FLAC</option>
+                <option value="wav">WAV</option>
+                <option value="wav32">WAV 32-bit</option>
+                <option value="mp3">MP3</option>
+                <option value="opus">Opus</option>
+                <option value="aac">AAC</option>
+              </select>
+            </label>
+            <button id="mergeExtractionsButton" class="secondary-button" type="button">Merge Selected</button>
+          </div>
+          <div id="extractionList" class="generated-list">
+            <div class="empty-result">No extractions yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>ACE Runtime</h2>
+            <span id="extractRuntimeState" class="mini-state">Base slot</span>
+          </div>
+          <div class="summary">
+            <strong>Track extraction uses ACE-Step Base.</strong><br>
+            Turbo remains the transition runtime. Base is loaded by ACE in the secondary runtime slot when available.
+          </div>
+        </section>
+
+        <section class="panel logs-panel">
+          <div class="panel-heading">
+            <h2>Logs</h2>
+            <span class="mini-state">Local</span>
+          </div>
+          <ol id="extractLogList" class="log-list"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <main id="lokrTrainingPage" class="workspace app-page lokr-page">
+      <section class="panel lokr-datasets-panel">
+        <div class="panel-heading">
+          <h2>Datasets</h2>
+          <span id="lokrDatasetState" class="mini-state">Ready</span>
+        </div>
+        <label class="field">
+          <span>New dataset label</span>
+          <input id="lokrNewDatasetLabel" type="text" value="New LoKr dataset" />
+        </label>
+        <div class="button-row">
+          <button id="createLokrDatasetButton" class="primary-button" type="button">Create Dataset</button>
+          <button id="refreshLokrDatasetsButton" class="secondary-button" type="button">Refresh</button>
+        </div>
+        <div id="lokrDatasetList" class="generated-list">
+          <div class="empty-result">No LoKr datasets yet.</div>
+        </div>
+      </section>
+
+      <section class="panel lokr-editor-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Dataset Builder</h2>
+            <div id="lokrActiveDatasetReadout" class="editor-subtitle">No dataset selected</div>
+          </div>
+          <button id="saveLokrDatasetButton" class="primary-button" type="button">Save Dataset</button>
+        </div>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>Label</span>
+            <input id="lokrDatasetLabel" type="text" placeholder="dataset name" />
+          </label>
+          <label class="field">
+            <span>Trigger tag</span>
+            <input id="lokrCustomTag" type="text" placeholder="optional trigger word" />
+          </label>
+          <label class="field">
+            <span>Default genre</span>
+            <input id="lokrDefaultGenre" type="text" placeholder="optional default genre" />
+          </label>
+          <label class="field">
+            <span>Default language</span>
+            <input id="lokrDefaultLanguage" type="text" value="unknown" />
+          </label>
+          <label class="field">
+            <span>Tag position</span>
+            <select id="lokrTagPosition">
+              <option value="prepend">Prepend</option>
+              <option value="append">Append</option>
+              <option value="replace">Replace caption</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Genre ratio</span>
+            <input id="lokrGenreRatio" type="number" min="0" max="100" step="1" value="0" />
+          </label>
+          <label class="field">
+            <span>Samples</span>
+            <input id="lokrSampleCount" type="text" readonly />
+          </label>
+        </div>
+        <div class="toggle-row">
+          <label><input id="lokrAllInstrumental" type="checkbox" checked /> All instrumental</label>
+        </div>
+
+        <div id="lokrEntryList" class="lokr-entry-list">
+          <div class="empty-result">Create or select a dataset to add songs.</div>
+        </div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Add Songs</h2>
+            <span id="lokrEntryState" class="mini-state">Idle</span>
+          </div>
+
+          <div id="lokrDropZone" class="drop-zone">
+            <strong>Drop audio files here</strong>
+            <span>MP3, WAV, FLAC, OGG, M4A, OPUS</span>
+          </div>
+          <div class="file-picker">
+            <label class="file-button" for="lokrAudioFiles">Choose Audio Files</label>
+            <input id="lokrAudioFiles" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,.opus,audio/*" multiple />
+            <span id="lokrSelectedFiles">No files selected</span>
+          </div>
+
+          <div class="existing-source-picker">
+            <label class="field">
+              <span>Existing creation</span>
+              <select id="lokrAssetSelect">
+                <option value="">Choose an existing creation</option>
+              </select>
+            </label>
+            <button id="addLokrAssetButton" class="secondary-button" type="button">Add Creation</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Dataset Status</h2>
+            <span id="lokrValidationState" class="mini-state">No dataset</span>
+          </div>
+          <div id="lokrDatasetSummary" class="summary">LoKr datasets save as Side-Step / ACE-Step compatible JSON. Lyrics can be left instrumental with [Instrumental].</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Side-Step</h2>
+            <span id="lokrRunState" class="mini-state">Idle</span>
+          </div>
+          <div class="control-grid">
+            <label class="field">
+              <span>Model</span>
+              <select id="lokrTrainModel">
+                <option value="turbo" selected>ACE-Step 1.5 XL Turbo</option>
+                <option value="base">ACE-Step 1.5 XL Base</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Epochs</span>
+              <input id="lokrTrainEpochs" type="number" min="1" step="1" value="500" />
+            </label>
+            <label class="field">
+              <span>Save every</span>
+              <input id="lokrTrainSaveEvery" type="number" min="1" step="1" value="10" />
+            </label>
+            <label class="field">
+              <span>LoKr dim</span>
+              <input id="lokrTrainDim" type="number" min="1" step="1" value="64" />
+            </label>
+            <label class="field">
+              <span>LoKr alpha</span>
+              <input id="lokrTrainAlpha" type="number" min="1" step="1" value="128" />
+            </label>
+            <label class="field">
+              <span>Optimizer</span>
+              <select id="lokrTrainOptimizer">
+                <option value="adamw8bit" selected>AdamW 8-bit</option>
+                <option value="adamw">AdamW</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Batch size</span>
+              <input id="lokrTrainBatchSize" type="number" min="1" step="1" value="1" />
+            </label>
+            <label class="field">
+              <span>Grad accumulation</span>
+              <input id="lokrTrainGradAccum" type="number" min="1" step="1" value="4" />
+            </label>
+            <label class="field">
+              <span>Chunk duration seconds</span>
+              <input id="lokrTrainChunkDuration" type="number" min="1" step="1" placeholder="optional" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Side-Step command</span>
+            <input id="lokrSidestepCommand" type="text" value="uv run sidestep" />
+          </label>
+          <label class="field">
+            <span>Checkpoint dir</span>
+            <input id="lokrCheckpointDir" type="text" value="runtimes/ACE-Step-1.5/checkpoints" />
+          </label>
+          <div class="toggle-row">
+            <label><input id="lokrGradientCheckpointing" type="checkbox" checked /> Gradient checkpointing</label>
+            <label><input id="lokrOffloadEncoder" type="checkbox" checked /> Offload encoder</label>
+          </div>
+          <div class="button-row">
+            <button id="preprocessLokrButton" class="secondary-button" type="button">Preprocess Dataset</button>
+            <button id="trainLokrButton" class="primary-button" type="button">Start LoKr Training</button>
+            <button id="stopLokrRunButton" class="secondary-button" type="button" disabled>Stop Current Run</button>
+          </div>
+          <div id="lokrTrainingReadiness" class="summary">Select a dataset and preprocess it before training.</div>
+          <div id="lokrRunList" class="generated-list">
+            <div class="empty-result">No Side-Step runs yet.</div>
+          </div>
+          <div class="button-row">
+            <button id="clearLokrLogButton" class="secondary-button" type="button">Clear Log View</button>
+          </div>
+          <div id="lokrRunLog" class="activity-readout">Select a run to view logs.</div>
+        </section>
+      </aside>
+    </main>
+
+    <main id="instrumentLabPage" class="workspace app-page instrument-page">
+      <section class="panel instrument-source-panel">
+        <div class="panel-heading">
+          <h2>Clip</h2>
+          <span id="instrumentLabState" class="mini-state">Ready</span>
+        </div>
+        <label class="field">
+          <span>Clip name</span>
+          <input id="instrumentClipLabel" type="text" value="Instrument idea" />
+        </label>
+        <div class="control-grid">
+          <label class="field">
+            <span>BPM</span>
+            <input id="instrumentBpm" type="number" min="20" max="300" step="1" value="120" />
+          </label>
+          <label class="field">
+            <span>Key</span>
+            <input id="instrumentKey" type="text" placeholder="optional" />
+          </label>
+          <label class="field">
+            <span>Bars</span>
+            <input id="instrumentBars" type="number" min="1" max="64" step="1" value="4" />
+          </label>
+          <label class="field">
+            <span>Octave</span>
+            <input id="instrumentOctave" type="number" min="1" max="7" step="1" value="4" />
+          </label>
+        </div>
+
+        <div class="panel-heading compact-heading">
+          <h2>Tracks</h2>
+          <button id="addInstrumentTrackButton" class="secondary-button compact-button" type="button">Add Track</button>
+        </div>
+        <div id="instrumentTrackList" class="instrument-track-list"></div>
+
+        <div class="existing-source-picker">
+          <label class="field">
+            <span>Import creation</span>
+            <select id="instrumentAssetSelect">
+              <option value="">Choose an existing creation</option>
+            </select>
+          </label>
+          <button id="importInstrumentAssetButton" class="secondary-button" type="button">Add Audio Track</button>
+        </div>
+      </section>
+
+      <section class="panel instrument-editor-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Performance Editor</h2>
+            <div id="instrumentActiveTrackReadout" class="editor-subtitle">No track selected</div>
+          </div>
+          <div class="button-row">
+            <button id="playInstrumentButton" class="primary-button" type="button">Play</button>
+            <button id="stopInstrumentButton" class="secondary-button" type="button">Stop</button>
+            <button id="recordInstrumentButton" class="secondary-button" type="button">Record Keys</button>
+            <button id="deleteInstrumentNoteButton" class="secondary-button" type="button">Delete Note</button>
+            <button id="copyInstrumentNotesButton" class="secondary-button" type="button">Copy Notes</button>
+            <button id="pasteInstrumentNotesButton" class="secondary-button" type="button">Paste Notes</button>
+          </div>
+        </div>
+        <div class="piano-roll-toolbar" aria-label="Piano roll navigation">
+          <button id="pianoRollZoomOutButton" class="secondary-button" type="button" title="Zoom out">Zoom Out</button>
+          <button id="pianoRollZoomInButton" class="secondary-button" type="button" title="Zoom in">Zoom In</button>
+          <button id="pianoRollFitButton" class="secondary-button" type="button" title="Fit full project">Fit All</button>
+          <span id="pianoRollViewportReadout" class="mini-state">Full view</span>
+        </div>
+        <canvas id="instrumentPianoRoll" class="instrument-piano-roll" width="960" height="480"></canvas>
+        <label class="piano-roll-scroll">
+          <span>Position</span>
+          <input id="pianoRollScroll" type="range" min="0" max="0" step="0.25" value="0" />
+        </label>
+        <div id="instrumentPianoKeys" class="instrument-piano-keys" aria-label="Playable piano keyboard"></div>
+        <div class="summary">Computer keys: A W S E D F T G Y H U J K. Click the grid to add notes, drag to move, drag a note edge to resize.</div>
+      </section>
+
+      <section class="panel instrument-output-panel">
+        <div class="panel-heading">
+          <h2>Instrument</h2>
+          <span id="instrumentBankState" class="mini-state">Loading</span>
+        </div>
+        <div class="control-grid">
+          <label class="field">
+            <span>Instrument</span>
+            <select id="instrumentPatch">
+              <option value="">Loading instruments</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Volume</span>
+            <input id="instrumentMasterVolume" type="number" min="0" max="1" step="0.05" value="0.8" />
+          </label>
+        </div>
+        <div id="instrumentInfo" class="activity-readout">Choose an instrument for the active track.</div>
+        <div class="sfz-import-block">
+          <h3>Import SFZ</h3>
+          <label class="field">
+            <span>Name</span>
+            <input id="sfzInstrumentLabel" type="text" placeholder="My soundfont instrument" />
+          </label>
+          <label class="field">
+            <span>SFZ file</span>
+            <input id="sfzInstrumentFile" type="file" accept=".sfz" />
+          </label>
+          <label class="field">
+            <span>Samples</span>
+            <input id="sfzSampleFiles" type="file" accept=".wav,.flac,.mp3,.ogg,.aiff,.aif" multiple />
+          </label>
+          <button id="importSfzButton" class="secondary-button" type="button">Import SFZ</button>
+        </div>
+        <div class="panel-heading compact-heading">
+          <h2>Render</h2>
+          <span id="instrumentRenderState" class="mini-state">Idle</span>
+        </div>
+        <div class="button-row">
+          <button id="renderInstrumentButton" class="secondary-button" type="button">Render Preview</button>
+          <button id="saveInstrumentTrackButton" class="secondary-button" type="button">Save Track</button>
+          <button id="saveInstrumentButton" class="primary-button" type="button">Save Clip</button>
+        </div>
+        <audio id="instrumentPreviewAudio" class="audio-player" controls preload="metadata"></audio>
+        <div class="output-block">
+          <h3>Instrument Clips</h3>
+          <div id="instrumentClipList" class="generated-list">
+            <div class="empty-result">No instrument clips yet.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <main id="audioEditPage" class="workspace app-page editor-page">
+      <section class="panel editor-assets-panel">
+        <div class="panel-heading">
+          <h2>Dance Station Assets</h2>
+          <span id="editorAssetState" class="mini-state">Loading</span>
+        </div>
+        <div class="control-grid editor-filter-grid">
+          <label class="field">
+            <span>Search</span>
+            <input id="editorAssetSearch" type="text" placeholder="label, category, path" />
+          </label>
+          <label class="field">
+            <span>Category</span>
+            <select id="editorCategoryFilter">
+              <option value="all">All</option>
+              <option value="transition">Transitions</option>
+              <option value="generation">Generations</option>
+              <option value="extraction">Extractions</option>
+              <option value="merge">Merges</option>
+              <option value="edit">Edits</option>
+            </select>
+          </label>
+          <div class="field button-field">
+            <span>Library</span>
+            <button id="refreshEditorAssetsButton" class="secondary-button" type="button">Refresh Assets</button>
+          </div>
+        </div>
+        <div id="editorAssetList" class="editor-asset-list">
+          <div class="empty-result">No Dance Station audio assets yet.</div>
+        </div>
+      </section>
+
+      <section class="panel editor-shell">
+        <div class="panel-heading editor-heading">
+          <div>
+            <h2>Audio Editor</h2>
+            <div id="editorCurrentAsset" class="editor-subtitle">AudioMass</div>
+          </div>
+          <div class="button-row">
+            <button id="reloadAudioEditorButton" class="secondary-button" type="button">Reload</button>
+            <button id="openAudioEditorButton" class="secondary-button" type="button">Open Window</button>
+          </div>
+        </div>
+        <iframe
+          id="audioEditorFrame"
+          class="audio-editor-frame"
+          title="AudioMass audio editor"
+          src="/audiomass/"
+          allow="autoplay; clipboard-read; clipboard-write; microphone"
+        ></iframe>
+      </section>
+
+      <section class="panel editor-save-panel">
+        <div class="panel-heading">
+          <h2>Save Edited Result</h2>
+          <span id="editSaveState" class="mini-state">Ready</span>
+        </div>
+        <label class="field">
+          <span>Edit name</span>
+          <input id="editSaveLabelInput" type="text" placeholder="Edited transition, cleaned vocal, final mix" />
+        </label>
+        <div class="file-picker">
+          <label class="file-button" for="editSaveFile">Fallback File</label>
+          <input id="editSaveFile" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,audio/*" />
+          <span id="editSaveFileName">No file selected</span>
+        </div>
+        <div id="editSourceAssetReadout" class="summary">No Dance Station source asset selected.</div>
+        <div class="button-row">
+          <button id="saveEditButton" class="primary-button" type="button">Save Edit</button>
+        </div>
+      </section>
+    </main>
+
+    <main id="libraryPage" class="workspace app-page library-page">
+      <section class="panel library-browser-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Local Library</h2>
+            <div id="libraryIndexPath" class="editor-subtitle">Index not loaded</div>
+          </div>
+          <span id="libraryState" class="mini-state">Loading</span>
+        </div>
+
+        <div class="control-grid editor-filter-grid">
+          <label class="field">
+            <span>Search</span>
+            <input id="librarySearch" type="text" placeholder="title, kind, tag, path" />
+          </label>
+          <label class="field">
+            <span>Kind</span>
+            <select id="libraryKindFilter">
+              <option value="all">All</option>
+              <option value="generation">Generations</option>
+              <option value="transition">Transitions</option>
+              <option value="extraction">Extractions</option>
+              <option value="merge">Merges</option>
+              <option value="edit">Edits</option>
+              <option value="instrument">Instrument Clips</option>
+              <option value="instrumenttrack">Instrument Tracks</option>
+              <option value="dataset">Datasets</option>
+              <option value="lokr">LoKr Adapters</option>
+            </select>
+          </label>
+          <div class="field button-field">
+            <span>Index</span>
+            <button id="reindexLibraryButton" class="primary-button" type="button">Reindex Creations</button>
+          </div>
+          <div class="field button-field">
+            <span>View</span>
+            <button id="refreshLibraryButton" class="secondary-button" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div id="libraryList" class="library-list">
+          <div class="empty-result">No local library items yet.</div>
+        </div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Public Library</h2>
+            <span id="publicLibraryState" class="mini-state">Not loaded</span>
+          </div>
+          <div class="control-grid">
+            <label class="field">
+              <span>Kind</span>
+              <select id="publicLibraryKind">
+                <option value="all">All</option>
+                <option value="generation">Generations</option>
+                <option value="transition">Transitions</option>
+                <option value="extraction">Extractions</option>
+                <option value="merge">Merges</option>
+                <option value="edit">Edits</option>
+                <option value="instrument">Instrument Clips</option>
+                <option value="instrumenttrack">Instrument Tracks</option>
+                <option value="dataset">Datasets</option>
+                <option value="lokr">LoKr Adapters</option>
+              </select>
+            </label>
+            <div class="field button-field">
+              <span>Browse</span>
+              <button id="refreshPublicLibraryButton" class="secondary-button" type="button">Load Public</button>
+            </div>
+          </div>
+          <div id="publicLibraryList" class="library-list compact-library-list">
+            <div class="empty-result">Load the public library to import items.</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Public Connection</h2>
+            <span id="libraryPublishState" class="mini-state">Not configured</span>
+          </div>
+          <div class="control-grid">
+            <label class="field">
+              <span>Site API</span>
+              <input id="librarySiteUrl" type="text" value="http://localhost:3001" />
+            </label>
+            <label class="field">
+              <span>Creator publish token</span>
+              <input id="libraryPublishToken" type="password" placeholder="Paste token from the site" />
+            </label>
+          </div>
+          <div class="button-row generated-actions">
+            <button id="saveLibraryConnectionButton" class="primary-button" type="button">Save Connection</button>
+          </div>
+          <div class="summary">
+            Create a publish token on the Dance Station page of the site, then paste it here. Media uploads go through the site to Bunny CDN.
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Library Status</h2>
+            <span id="libraryDetailState" class="mini-state">Local</span>
+          </div>
+          <div id="librarySummary" class="summary">
+            The local library indexes saved Dance Station creations without copying media files. Public sync is a later step.
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
