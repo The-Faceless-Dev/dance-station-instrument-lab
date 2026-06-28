@@ -356,6 +356,8 @@ function draw() {
   ctx.moveTo(cursorX, m.padTop);
   ctx.lineTo(cursorX, m.height - m.padBottom);
   ctx.stroke();
+  ctx.fillStyle = "#36d1b7";
+  ctx.fillRect(cursorX - 5 * m.scale, m.padTop, 10 * m.scale, 8 * m.scale);
 }
 
 function drawNote(ctx, m, note, active) {
@@ -387,14 +389,35 @@ function pointerPoint(event) {
   return { x: (event.clientX - rect.left) * scale, y: (event.clientY - rect.top) * scale };
 }
 
+function cursorHit(point, m) {
+  const cursorX = beatToX(state.cursorBeat, m);
+  return Math.abs(point.x - cursorX) <= 8 * m.scale
+    && point.y >= m.padTop
+    && point.y <= m.height - m.padBottom;
+}
+
 function beginEdit(event) {
-  const track = activeTrack();
-  if (!track || track.kind !== "instrument") return;
+  event.preventDefault();
+  el.canvas.setPointerCapture?.(event.pointerId);
+  let track = activeTrack();
   const m = metrics();
   const point = pointerPoint(event);
+  if (cursorHit(point, m)) {
+    state.drag = { mode: "cursor" };
+    return;
+  }
+  if (!track || track.kind !== "instrument") {
+    const instrumentTrack = state.tracks.find((candidate) => candidate.kind === "instrument");
+    if (!instrumentTrack) return;
+    state.activeTrackId = instrumentTrack.id;
+    track = instrumentTrack;
+    renderTracks();
+  }
   const note = noteAt(point, m);
   if (event.shiftKey) {
-    state.drag = { mode: "select", startBeat: state.cursorBeat, currentBeat: state.cursorBeat };
+    const beat = quantize(canvasToBeat(point.x, m));
+    state.cursorBeat = beat;
+    state.drag = { mode: "select", startBeat: beat, currentBeat: beat };
     return;
   }
   if (note) {
@@ -423,12 +446,18 @@ function beginEdit(event) {
 
 function moveEdit(event) {
   if (!state.drag) return;
-  const track = activeTrack();
-  if (!track || track.kind !== "instrument") return;
+  event.preventDefault();
   const m = metrics();
   const point = pointerPoint(event);
   const beat = quantize(canvasToBeat(point.x, m));
   const pitch = Math.max(0, Math.min(127, canvasToPitch(point.y, m)));
+  if (state.drag.mode === "cursor") {
+    state.cursorBeat = Math.max(0, Math.min(contentBounds().totalBeats, beat));
+    draw();
+    return;
+  }
+  const track = activeTrack();
+  if (!track || track.kind !== "instrument") return;
   if (state.drag.mode === "move") {
     const deltaBeat = beat - state.drag.startBeat;
     const deltaPitch = pitch - state.drag.startPitch;
@@ -452,7 +481,8 @@ function moveEdit(event) {
   draw();
 }
 
-function endEdit() {
+function endEdit(event) {
+  if (state.drag) el.canvas.releasePointerCapture?.(event?.pointerId);
   state.drag = null;
 }
 
@@ -584,7 +614,10 @@ async function scheduleTracks(context, destination, tracks, startAt, recordingPa
       source.buffer = buffer;
       gain.gain.value = track.volume;
       source.connect(gain).connect(destination);
-      source.start(startAt);
+      const offsetSeconds = Math.max(0, state.cursorBeat * beatSeconds());
+      if (offsetSeconds < buffer.duration) {
+        source.start(startAt, offsetSeconds);
+      }
       state.playingNodes.push(source);
     } else {
       for (const note of track.notes) {
