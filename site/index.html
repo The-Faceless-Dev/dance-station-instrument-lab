@@ -118,6 +118,20 @@
       </div>
     </section>
   </main>
+  <div id="instrumentModal" class="instrument-modal" aria-hidden="true">
+    <div class="instrument-modal__panel" role="dialog" aria-modal="true" aria-labelledby="instrumentModalTitle">
+      <div class="panel-heading">
+        <div>
+          <h2 id="instrumentModalTitle">Confirm action</h2>
+          <p id="instrumentModalMessage" class="modal-message"></p>
+        </div>
+      </div>
+      <div class="button-row modal-actions">
+        <button id="instrumentModalCancel" class="secondary-button" type="button">Cancel</button>
+        <button id="instrumentModalConfirm" class="primary-button" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
   <div id="toast" class="toast"></div>
   <script type="module" src="./site.js"></script>
 </body>

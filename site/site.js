@@ -63,6 +63,11 @@ const el = {
   preview: document.querySelector("#instrumentPreviewAudio"),
   clipList: document.querySelector("#instrumentClipList"),
   toast: document.querySelector("#toast"),
+  modal: document.querySelector("#instrumentModal"),
+  modalTitle: document.querySelector("#instrumentModalTitle"),
+  modalMessage: document.querySelector("#instrumentModalMessage"),
+  modalCancel: document.querySelector("#instrumentModalCancel"),
+  modalConfirm: document.querySelector("#instrumentModalConfirm"),
 };
 
 function createInstrumentTrack(label, instrument, id = `track-${crypto.randomUUID()}`) {
@@ -154,6 +159,45 @@ function showToast(message) {
   el.toast.classList.add("visible");
   window.clearTimeout(state.toastTimer);
   state.toastTimer = window.setTimeout(() => el.toast.classList.remove("visible"), 3200);
+}
+
+function confirmModal({ title = "Confirm action", message = "", confirmLabel = "Continue", cancelLabel = "Cancel" } = {}) {
+  return new Promise((resolve) => {
+    el.modalTitle.textContent = title;
+    el.modalMessage.textContent = message;
+    el.modalConfirm.textContent = confirmLabel;
+    el.modalCancel.textContent = cancelLabel;
+    el.modal.classList.add("open");
+    el.modal.setAttribute("aria-hidden", "false");
+    el.modalConfirm.focus();
+
+    function close(result) {
+      el.modal.classList.remove("open");
+      el.modal.setAttribute("aria-hidden", "true");
+      el.modalCancel.removeEventListener("click", onCancel);
+      el.modalConfirm.removeEventListener("click", onConfirm);
+      el.modal.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKeyDown);
+      resolve(result);
+    }
+    function onCancel() {
+      close(false);
+    }
+    function onConfirm() {
+      close(true);
+    }
+    function onBackdrop(event) {
+      if (event.target === el.modal) close(false);
+    }
+    function onKeyDown(event) {
+      if (event.key === "Escape") close(false);
+    }
+
+    el.modalCancel.addEventListener("click", onCancel);
+    el.modalConfirm.addEventListener("click", onConfirm);
+    el.modal.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKeyDown);
+  });
 }
 
 function activeTrack() {
@@ -269,7 +313,9 @@ function renderTracks() {
     row.querySelector(".save-track-button")?.addEventListener("click", () => {
       saveTrackById(track.id).catch((error) => showToast(error.message));
     });
-    row.querySelector(".remove-track-button").addEventListener("click", () => removeTrackById(track.id));
+    row.querySelector(".remove-track-button").addEventListener("click", () => {
+      removeTrackById(track.id).catch((error) => showToast(error.message));
+    });
     el.trackList.appendChild(row);
   });
   updateReadout();
@@ -279,10 +325,14 @@ function markTrackDirty(track) {
   if (track) track.dirty = true;
 }
 
-function removeTrackById(trackId) {
+async function removeTrackById(trackId) {
   const track = state.tracks.find((candidate) => candidate.id === trackId);
   if (!track) return;
-  if (track.dirty && !window.confirm(`Remove "${track.label}"? Unsaved changes on this track will be lost.`)) {
+  if (track.dirty && !(await confirmModal({
+    title: "Remove track?",
+    message: `Remove "${track.label}"? Unsaved changes on this track will be lost.`,
+    confirmLabel: "Remove Track",
+  }))) {
     return;
   }
   state.tracks = state.tracks.filter((candidate) => candidate.id !== trackId);
