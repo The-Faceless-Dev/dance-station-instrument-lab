@@ -457,9 +457,36 @@ function beginEdit(event) {
   const note = noteAt(point, m);
   if (state.selectionMode) {
     const beat = quantize(canvasToBeat(point.x, m));
+    if (note && state.selectedNoteIds.includes(note.id)) {
+      const noteEnd = beatToX(note.start + note.duration, m);
+      state.drag = {
+        mode: Math.abs(point.x - noteEnd) < 8 * m.scale ? "resize" : "move",
+        note,
+        startBeat: canvasToBeat(point.x, m),
+        startPitch: canvasToPitch(point.y, m),
+        originalStart: note.start,
+        originalDuration: note.duration,
+        originalPitch: note.pitch,
+      };
+      return;
+    }
     if (!note && state.selectedNoteIds.length) {
       clearSelectionMode();
       draw();
+      return;
+    }
+    if (note) {
+      state.selectedNoteIds = [note.id];
+      const noteEnd = beatToX(note.start + note.duration, m);
+      state.drag = {
+        mode: Math.abs(point.x - noteEnd) < 8 * m.scale ? "resize" : "move",
+        note,
+        startBeat: canvasToBeat(point.x, m),
+        startPitch: canvasToPitch(point.y, m),
+        originalStart: note.start,
+        originalDuration: note.duration,
+        originalPitch: note.pitch,
+      };
       return;
     }
     const endBeat = note ? note.start + note.duration : beat;
