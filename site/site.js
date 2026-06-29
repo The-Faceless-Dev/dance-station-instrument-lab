@@ -267,7 +267,8 @@ function contentBounds() {
   const barsBeats = Math.max(4, Number(el.bars.value || 4) * 4);
   const noteEnd = Math.max(0, ...allNotes().map((note) => note.start + note.duration));
   const audioEnd = state.tracks.some((track) => track.kind === "audio") ? barsBeats : 0;
-  const totalBeats = Math.max(barsBeats, noteEnd + 2, audioEnd);
+  const cursorEnd = Math.max(0, state.cursorBeat || 0) + 2;
+  const totalBeats = Math.max(barsBeats, noteEnd + 2, audioEnd, cursorEnd);
   const pitches = allNotes().map((note) => note.pitch);
   const minPitch = Math.max(0, Math.min(36, ...pitches));
   const maxPitch = Math.min(96, Math.max(84, ...pitches));
@@ -285,6 +286,17 @@ function clampView() {
   el.scroll.value = String(Math.min(max, state.view.beatOffset));
   el.scroll.disabled = max <= 0;
   el.viewport.textContent = `Beats ${state.view.beatOffset.toFixed(1)}-${(state.view.beatOffset + state.view.visibleBeats).toFixed(1)} | MIDI ${state.view.pitchOffset}-${state.view.pitchOffset + state.view.visiblePitches}`;
+}
+
+function keepCursorInView() {
+  const margin = Math.max(0.5, state.view.visibleBeats * 0.12);
+  const start = state.view.beatOffset;
+  const end = state.view.beatOffset + state.view.visibleBeats;
+  if (state.cursorBeat < start + margin) {
+    state.view.beatOffset = Math.max(0, state.cursorBeat - margin);
+  } else if (state.cursorBeat > end - margin) {
+    state.view.beatOffset = Math.max(0, state.cursorBeat - state.view.visibleBeats + margin);
+  }
 }
 
 function metrics() {
@@ -556,6 +568,7 @@ async function play() {
   setPill(el.status, "Playing", "ok");
   const timer = window.setInterval(() => {
     state.cursorBeat = state.transportStartBeat + Math.max(0, context.currentTime - startAt) / beatSeconds();
+    keepCursorInView();
     draw();
   }, 33);
   state.timers.push(timer);
@@ -576,6 +589,7 @@ async function record() {
     setPill(el.status, "Recording", "warn");
     const timer = window.setInterval(() => {
       state.cursorBeat = state.transportStartBeat + ((performance.now() - state.recordingStartedAt) / 1000) / beatSeconds();
+      keepCursorInView();
       draw();
     }, 33);
     state.timers.push(timer);
