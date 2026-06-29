@@ -92,6 +92,27 @@ function createAudioTrack(asset) {
   };
 }
 
+function createInstrumentTrackFromSaved(asset, savedTrack) {
+  return {
+    id: `track-${crypto.randomUUID()}`,
+    label: savedTrack?.label || asset.title || "Imported track",
+    kind: "instrument",
+    instrument: savedTrack?.instrument || savedTrack?.instrumentId || "synth.lead",
+    volume: Number(savedTrack?.volume ?? 0.85),
+    muted: Boolean(savedTrack?.muted ?? false),
+    playDuringRecord: Boolean(savedTrack?.playDuringRecord ?? true),
+    notes: Array.isArray(savedTrack?.notes)
+      ? savedTrack.notes.map((note) => ({
+        id: note.id || crypto.randomUUID(),
+        pitch: Number(note.pitch || 60),
+        start: Number(note.start || 0),
+        duration: Math.max(0.25, Number(note.duration || 0.5)),
+        velocity: Number(note.velocity || 0.82),
+      }))
+      : [],
+  };
+}
+
 function post(type, payload = {}, transfer) {
   window.parent.postMessage({ source: "dance-station-instrument-lab", type, payload }, hostOrigin, transfer || []);
 }
@@ -916,9 +937,21 @@ function handleKeydown(event) {
 function importAssetTrack() {
   const asset = state.assets.find((item) => item.id === el.assetSelect.value);
   if (!asset?.url) return showToast("Choose an audio asset first");
-  const track = createAudioTrack(asset);
+  const savedTracks = Array.isArray(asset.metadata?.tracks) ? asset.metadata.tracks : [];
+  const savedInstrumentTrack = savedTracks.find((track) => track?.kind === "instrument" && Array.isArray(track.notes));
+  const track = (asset.kind === "instrumenttrack" && savedInstrumentTrack)
+    ? createInstrumentTrackFromSaved(asset, savedInstrumentTrack)
+    : createAudioTrack(asset);
+  if (asset.metadata?.bpm) el.bpm.value = String(asset.metadata.bpm);
+  if (asset.metadata?.bars) el.bars.value = String(asset.metadata.bars);
+  if (asset.metadata?.key) el.key.value = String(asset.metadata.key);
   state.tracks.push(track);
   state.activeTrackId = track.id;
+  if (track.kind === "instrument") {
+    el.patch.value = track.instrument;
+    state.selectedNoteIds = [];
+    state.selectionMode = false;
+  }
   renderTracks();
   draw();
 }
