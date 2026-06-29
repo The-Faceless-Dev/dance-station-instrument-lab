@@ -7,6 +7,7 @@ const state = {
   tracks: [createInstrumentTrack("Track 1", "synth.lead", "track-main")],
   activeTrackId: "track-main",
   selectedNoteIds: [],
+  selectionMode: false,
   clipboard: [],
   cursorBeat: 0,
   recording: false,
@@ -362,14 +363,17 @@ function draw() {
     track.notes.forEach((note) => drawNote(ctx, m, note, track.id === state.activeTrackId));
   });
   const cursorX = beatToX(state.cursorBeat, m);
-  ctx.strokeStyle = "#36d1b7";
+  ctx.strokeStyle = state.selectionMode ? "#83a7ff" : "#36d1b7";
   ctx.lineWidth = 2 * m.scale;
   ctx.beginPath();
   ctx.moveTo(cursorX, m.padTop);
   ctx.lineTo(cursorX, m.height - m.padBottom);
   ctx.stroke();
-  ctx.fillStyle = "#36d1b7";
+  ctx.fillStyle = state.selectionMode ? "#83a7ff" : "#36d1b7";
   ctx.fillRect(cursorX - 5 * m.scale, m.padTop, 10 * m.scale, 8 * m.scale);
+  if (state.drag?.mode === "select") {
+    drawSelectionRange(ctx, m, state.drag.startBeat, state.drag.currentBeat);
+  }
 }
 
 function drawNote(ctx, m, note, active) {
@@ -408,6 +412,31 @@ function cursorHit(point, m) {
     && point.y <= m.height - m.padBottom;
 }
 
+function updateRangeSelection(startBeat, endBeat) {
+  const track = activeTrack();
+  if (!track || track.kind !== "instrument") return;
+  const start = Math.min(startBeat, endBeat);
+  const end = Math.max(startBeat, endBeat);
+  state.selectedNoteIds = track.notes
+    .filter((note) => note.start <= end && note.start + note.duration >= start)
+    .map((note) => note.id);
+}
+
+function clearSelectionMode() {
+  state.selectionMode = false;
+  state.selectedNoteIds = [];
+  setPill(el.status, "Ready", "neutral");
+}
+
+function drawSelectionRange(ctx, m, startBeat, endBeat) {
+  const startX = beatToX(Math.min(startBeat, endBeat), m);
+  const endX = beatToX(Math.max(startBeat, endBeat), m);
+  ctx.fillStyle = "rgba(131, 167, 255, 0.12)";
+  ctx.fillRect(startX, m.padTop, Math.max(2 * m.scale, endX - startX), m.height - m.padTop - m.padBottom);
+  ctx.strokeStyle = "rgba(131, 167, 255, 0.75)";
+  ctx.strokeRect(startX, m.padTop, Math.max(2 * m.scale, endX - startX), m.height - m.padTop - m.padBottom);
+}
+
 function beginEdit(event) {
   event.preventDefault();
   el.canvas.setPointerCapture?.(event.pointerId);
@@ -426,10 +455,24 @@ function beginEdit(event) {
     renderTracks();
   }
   const note = noteAt(point, m);
+  if (state.selectionMode) {
+    const beat = quantize(canvasToBeat(point.x, m));
+    if (!note && state.selectedNoteIds.length) {
+      clearSelectionMode();
+      draw();
+      return;
+    }
+    const endBeat = note ? note.start + note.duration : beat;
+    state.drag = { mode: "select", startBeat: state.cursorBeat, currentBeat: endBeat };
+    updateRangeSelection(state.cursorBeat, endBeat);
+    draw();
+    return;
+  }
   if (event.shiftKey) {
     const beat = quantize(canvasToBeat(point.x, m));
-    state.cursorBeat = beat;
-    state.drag = { mode: "select", startBeat: beat, currentBeat: beat };
+    state.drag = { mode: "select", startBeat: state.cursorBeat, currentBeat: beat };
+    updateRangeSelection(state.cursorBeat, beat);
+    draw();
     return;
   }
   if (note) {
@@ -486,9 +529,7 @@ function moveEdit(event) {
   }
   if (state.drag.mode === "select") {
     state.drag.currentBeat = beat;
-    const start = Math.min(state.drag.startBeat, beat);
-    const end = Math.max(state.drag.startBeat, beat);
-    state.selectedNoteIds = track.notes.filter((note) => note.start >= start && note.start <= end).map((note) => note.id);
+    updateRangeSelection(state.drag.startBeat, beat);
   }
   draw();
 }
@@ -506,6 +547,17 @@ function handleWheel(event) {
     state.view.beatOffset += event.deltaY > 0 ? 1 : -1;
     draw();
   }
+}
+
+function handleDoubleClick(event) {
+  const m = metrics();
+  const point = pointerPoint(event);
+  if (!cursorHit(point, m)) return;
+  event.preventDefault();
+  state.selectionMode = true;
+  state.selectedNoteIds = [];
+  setPill(el.status, "Select range", "warn");
+  draw();
 }
 
 function zoom(factor) {
@@ -529,6 +581,7 @@ function deleteSelected() {
   if (!track || track.kind !== "instrument") return;
   track.notes = track.notes.filter((note) => !state.selectedNoteIds.includes(note.id));
   state.selectedNoteIds = [];
+  state.selectionMode = false;
   draw();
 }
 
@@ -922,6 +975,7 @@ el.zoomIn.addEventListener("click", () => zoom(0.8));
 el.fit.addEventListener("click", fitAll);
 el.canvas.addEventListener("pointerdown", beginEdit);
 el.canvas.addEventListener("pointermove", moveEdit);
+el.canvas.addEventListener("dblclick", handleDoubleClick);
 el.canvas.addEventListener("wheel", handleWheel, { passive: false });
 window.addEventListener("pointerup", endEdit);
 window.addEventListener("keydown", handleKeydown);
