@@ -74,6 +74,7 @@ function createInstrumentTrack(label, instrument, id = `track-${crypto.randomUUI
     volume: 0.85,
     muted: false,
     playDuringRecord: true,
+    dirty: false,
     notes: [],
   };
 }
@@ -88,6 +89,7 @@ function createAudioTrack(asset) {
     volume: 0.85,
     muted: false,
     playDuringRecord: true,
+    dirty: false,
     notes: [],
   };
 }
@@ -101,6 +103,7 @@ function createInstrumentTrackFromSaved(asset, savedTrack) {
     volume: Number(savedTrack?.volume ?? 0.85),
     muted: Boolean(savedTrack?.muted ?? false),
     playDuringRecord: Boolean(savedTrack?.playDuringRecord ?? true),
+    dirty: false,
     notes: Array.isArray(savedTrack?.notes)
       ? savedTrack.notes.map((note) => ({
         id: note.id || crypto.randomUUID(),
@@ -238,6 +241,7 @@ function renderTracks() {
         <label><input class="track-record" type="checkbox"${track.playDuringRecord ? " checked" : ""} /> Play while recording</label>
       </div>
       ${track.kind === "instrument" ? '<button class="secondary-button save-track-button" type="button">Save Track</button>' : ""}
+      <button class="secondary-button remove-track-button" type="button">Remove Track</button>
     `;
     row.querySelector("button").addEventListener("click", () => {
       state.activeTrackId = track.id;
@@ -247,23 +251,48 @@ function renderTracks() {
     });
     row.querySelector(".track-label").addEventListener("input", (event) => {
       track.label = event.target.value;
+      markTrackDirty(track);
       updateReadout();
     });
     row.querySelector(".track-volume").addEventListener("input", (event) => {
       track.volume = Number(event.target.value || 0.85);
+      markTrackDirty(track);
     });
     row.querySelector(".track-muted").addEventListener("change", (event) => {
       track.muted = event.target.checked;
+      markTrackDirty(track);
     });
     row.querySelector(".track-record").addEventListener("change", (event) => {
       track.playDuringRecord = event.target.checked;
+      markTrackDirty(track);
     });
     row.querySelector(".save-track-button")?.addEventListener("click", () => {
       saveTrackById(track.id).catch((error) => showToast(error.message));
     });
+    row.querySelector(".remove-track-button").addEventListener("click", () => removeTrackById(track.id));
     el.trackList.appendChild(row);
   });
   updateReadout();
+}
+
+function markTrackDirty(track) {
+  if (track) track.dirty = true;
+}
+
+function removeTrackById(trackId) {
+  const track = state.tracks.find((candidate) => candidate.id === trackId);
+  if (!track) return;
+  if (track.dirty && !window.confirm(`Remove "${track.label}"? Unsaved changes on this track will be lost.`)) {
+    return;
+  }
+  state.tracks = state.tracks.filter((candidate) => candidate.id !== trackId);
+  if (state.activeTrackId === trackId) {
+    state.activeTrackId = state.tracks[0]?.id || "";
+  }
+  state.selectedNoteIds = [];
+  state.selectionMode = false;
+  renderTracks();
+  draw();
 }
 
 function updateReadout() {
@@ -473,7 +502,10 @@ function beginEdit(event) {
   }
   if (!track || track.kind !== "instrument") {
     const instrumentTrack = state.tracks.find((candidate) => candidate.kind === "instrument");
-    if (!instrumentTrack) return;
+    if (!instrumentTrack) {
+      showToast("Add an instrument track before creating notes");
+      return;
+    }
     state.activeTrackId = instrumentTrack.id;
     track = instrumentTrack;
     renderTracks();
@@ -544,6 +576,7 @@ function beginEdit(event) {
     state.cursorBeat = beat;
     const newNote = { id: crypto.randomUUID(), pitch, start: beat, duration: 1, velocity: 0.82 };
     track.notes.push(newNote);
+    markTrackDirty(track);
     state.selectedNoteIds = [newNote.id];
     state.drag = { mode: "resize", note: newNote, startBeat: beat, startPitch: pitch, originalStart: beat, originalDuration: 1, originalPitch: pitch };
   }
@@ -572,11 +605,13 @@ function moveEdit(event) {
       note.start = Math.max(0, quantize(note.start === state.drag.originalStart ? state.drag.originalStart + deltaBeat : note.start + deltaBeat));
       note.pitch = Math.max(0, Math.min(127, note.pitch === state.drag.originalPitch ? state.drag.originalPitch + deltaPitch : note.pitch + deltaPitch));
     });
+    markTrackDirty(track);
     state.drag.startBeat = beat;
     state.drag.startPitch = pitch;
   }
   if (state.drag.mode === "resize") {
     state.drag.note.duration = Math.max(0.25, quantize(beat - state.drag.note.start));
+    markTrackDirty(track);
   }
   if (state.drag.mode === "select") {
     state.drag.currentBeat = beat;
@@ -631,6 +666,7 @@ function deleteSelected() {
   const track = activeTrack();
   if (!track || track.kind !== "instrument") return;
   track.notes = track.notes.filter((note) => !state.selectedNoteIds.includes(note.id));
+  markTrackDirty(track);
   state.selectedNoteIds = [];
   state.selectionMode = false;
   draw();
@@ -859,6 +895,10 @@ async function save(trackOnly = false) {
       tracks: tracks.map(serializeTrack),
       audio: wav,
     }, [wav]);
+    tracks.forEach((track) => {
+      track.dirty = false;
+    });
+    renderTracks();
   } catch (error) {
     setPill(el.renderState, "Error", "error");
     showToast(error.message);
@@ -885,6 +925,8 @@ async function saveTrackById(trackId) {
       tracks: [serializeTrack(track)],
       audio: wav,
     }, [wav]);
+    track.dirty = false;
+    renderTracks();
   } catch (error) {
     setPill(el.renderState, "Error", "error");
     showToast(error.message);
@@ -893,7 +935,7 @@ async function saveTrackById(trackId) {
 
 function serializeTrack(track) {
   return track.kind === "instrument"
-    ? { ...track, notes: track.notes.map((note) => ({ ...note })) }
+    ? { ...track, dirty: false, notes: track.notes.map((note) => ({ ...note })) }
     : { id: track.id, label: track.label, kind: track.kind, sourceTitle: track.sourceTitle, muted: track.muted, playDuringRecord: track.playDuringRecord, volume: track.volume };
 }
 
@@ -906,6 +948,7 @@ async function playKeyboardPitch(pitch) {
   await scheduleNote(context, context.destination, { ...note, start: 0 }, track, context.currentTime + 0.01);
   if (state.recording) {
     track.notes.push(note);
+    markTrackDirty(track);
     draw();
   }
 }

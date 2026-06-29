@@ -218,6 +218,11 @@ h3 {
   justify-self: start;
 }
 
+.remove-track-button {
+  justify-self: start;
+  color: #ffc2c8;
+}
+
 .piano-roll-toolbar {
   justify-content: space-between;
 }
