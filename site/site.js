@@ -59,7 +59,6 @@ const el = {
   volume: document.querySelector("#instrumentMasterVolume"),
   info: document.querySelector("#instrumentInfo"),
   render: document.querySelector("#renderInstrumentButton"),
-  saveTrack: document.querySelector("#saveInstrumentTrackButton"),
   saveClip: document.querySelector("#saveInstrumentButton"),
   preview: document.querySelector("#instrumentPreviewAudio"),
   clipList: document.querySelector("#instrumentClipList"),
@@ -217,6 +216,7 @@ function renderTracks() {
         <label><input class="track-muted" type="checkbox"${track.muted ? " checked" : ""} /> Mute</label>
         <label><input class="track-record" type="checkbox"${track.playDuringRecord ? " checked" : ""} /> Play while recording</label>
       </div>
+      ${track.kind === "instrument" ? '<button class="secondary-button save-track-button" type="button">Save Track</button>' : ""}
     `;
     row.querySelector("button").addEventListener("click", () => {
       state.activeTrackId = track.id;
@@ -236,6 +236,9 @@ function renderTracks() {
     });
     row.querySelector(".track-record").addEventListener("change", (event) => {
       track.playDuringRecord = event.target.checked;
+    });
+    row.querySelector(".save-track-button")?.addEventListener("click", () => {
+      saveTrackById(track.id).catch((error) => showToast(error.message));
     });
     el.trackList.appendChild(row);
   });
@@ -841,6 +844,32 @@ async function save(trackOnly = false) {
   }
 }
 
+async function saveTrackById(trackId) {
+  const track = state.tracks.find((candidate) => candidate.id === trackId);
+  if (!track || track.kind !== "instrument") {
+    showToast("Choose an instrument track to save");
+    return;
+  }
+  try {
+    setPill(el.renderState, "Saving", "warn");
+    const wav = await renderWav([{ ...track, muted: false }]);
+    post("instrument-lab:save", {
+      name: `${safeStem(track.label)}.wav`,
+      title: track.label,
+      kind: "instrumenttrack",
+      mimeType: "audio/wav",
+      bpm: Number(el.bpm.value || 120),
+      key: el.key.value || "",
+      bars: Number(el.bars.value || 4),
+      tracks: [serializeTrack(track)],
+      audio: wav,
+    }, [wav]);
+  } catch (error) {
+    setPill(el.renderState, "Error", "error");
+    showToast(error.message);
+  }
+}
+
 function serializeTrack(track) {
   return track.kind === "instrument"
     ? { ...track, notes: track.notes.map((note) => ({ ...note })) }
@@ -983,7 +1012,6 @@ el.deleteNote.addEventListener("click", deleteSelected);
 el.copyNotes.addEventListener("click", copySelected);
 el.pasteNotes.addEventListener("click", pasteNotes);
 el.render.addEventListener("click", () => renderPreview());
-el.saveTrack.addEventListener("click", () => save(true));
 el.saveClip.addEventListener("click", () => save(false));
 el.patch.addEventListener("change", () => {
   const track = activeTrack();

@@ -214,6 +214,10 @@ h3 {
   align-items: center;
 }
 
+.save-track-button {
+  justify-self: start;
+}
+
 .piano-roll-toolbar {
   justify-content: space-between;
 }
